@@ -74,8 +74,8 @@ if __name__ == '__main__':
             print(f'Training shard {t} done. {count} images processed.')
 
         for v in val:
-            count = append_id_v2(f'{args.data_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}',
-                                 ids, f'{args.out_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}')
+            count = append_id_v2(f'{args.data_dir}/{args.format_val}.tfrecord-{v:05d}-of-{args.val:05d}',
+                                 ids, f'{args.out_dir}/{args.format_val}.tfrecord-{v:05d}-of-{args.val:05d}')
             print(f'Validation shard {t} done. {count} images processed.')
     else:
         print("Checking dataset...")
