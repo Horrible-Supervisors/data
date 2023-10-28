@@ -1,7 +1,9 @@
+import os
 from argparse import ArgumentParser
-import tensorflow as tf
+
 import numpy as np
 from PIL import Image
+import tensorflow as tf
 
 
 def append_id_v2(infile, ids, out_file, count=0):
@@ -37,6 +39,13 @@ def check_image(infile):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument('--format-train', '-ft', type=str,
+                        help='tfrecord format for train')
+    parser.add_argument('--format-val', '-fv', type=str,
+                        help='tfrecord format for validation')
+    parser.add_argument('--create-dataset', '-cd', action='store_true',
+                        help='create dataset')
+
     parser.add_argument('--data-dir', type=str)
     parser.add_argument('--out-dir', type=str)
     parser.add_argument('--train', '-t', type=int,
@@ -45,16 +54,14 @@ if __name__ == '__main__':
                         help='number of validation tfrecords')
     parser.add_argument('--size', '-s', type=int,
                         help='total number of images')
-    parser.add_argument('--format-train', '-ft', type=str,
-                        help='tfrecord format for train')
-    parser.add_argument('--format-val', '-fv', type=str,
-                        help='tfrecord format for validation')
-    parser.add_argument('--create-dataset', '-cd', action='store_true',
-                        help='create dataset')
     args = parser.parse_args()
 
     if args.create_dataset:
         print("Creating dataset...")
+
+        if not os.path.exists(args.out_dir):
+            os.makedirs(args.out_dir)
+
         ids = np.arange(args.size)
         train = np.arange(args.train)
         val = np.arange(args.val)
@@ -64,10 +71,12 @@ if __name__ == '__main__':
         for t in train:
             count = append_id_v2(f'{args.data_dir}/{args.format_train}.tfrecord-{t:05d}-of-{args.train:05d}',
                                  ids, f'{args.out_dir}/{args.format_train}.tfrecord-{t:05d}-of-{args.train:05d}')
+            print(f'Training shard {t} done. {count} images processed.')
 
         for v in val:
             count = append_id_v2(f'{args.data_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}',
                                  ids, f'{args.out_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}')
+            print(f'Validation shard {t} done. {count} images processed.')
     else:
         print("Checking dataset...")
         check_image(
