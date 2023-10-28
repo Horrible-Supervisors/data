@@ -37,23 +37,24 @@ def check_image(infile):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--data_dir', type=str)
-    parser.add_argument('--out_dir', type=str)
+    parser.add_argument('--data-dir', type=str)
+    parser.add_argument('--out-dir', type=str)
     parser.add_argument('--train', '-t', type=int,
-                        description='number of train tfrecords')
+                        help='number of train tfrecords')
     parser.add_argument('--val', '-v', type=int,
-                        description='number of validation tfrecords')
+                        help='number of validation tfrecords')
     parser.add_argument('--size', '-s', type=int,
-                        description='total number of images')
-    parser.add_argument('--format_train', '-ft', type=str,
-                        description='tfrecord format for train')
-    parser.add_argument('--format_val', '-fv', type=str,
-                        description='tfrecord format for validation')
-    parser.add_argument('--create_dataset', '-cd', type=bool,
-                        description='create dataset or not')
+                        help='total number of images')
+    parser.add_argument('--format-train', '-ft', type=str,
+                        help='tfrecord format for train')
+    parser.add_argument('--format-val', '-fv', type=str,
+                        help='tfrecord format for validation')
+    parser.add_argument('--create-dataset', '-cd', action='store_true',
+                        help='create dataset')
     args = parser.parse_args()
 
     if args.create_dataset:
+        print("Creating dataset...")
         ids = np.arange(args.size)
         train = np.arange(args.train)
         val = np.arange(args.val)
@@ -68,5 +69,6 @@ if __name__ == '__main__':
             count = append_id_v2(f'{args.data_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}',
                                  ids, f'{args.out_dir}/{args.format_val}.tfrecord-{t:05d}-of-{args.val:05d}')
     else:
+        print("Checking dataset...")
         check_image(
             f'{args.data_dir}/{args.format_train}.tfrecord-{0:05d}-of-{args.train:05d}')
