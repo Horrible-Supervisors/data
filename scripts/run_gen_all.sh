@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# sbatch scripts/run_gen_image_vars0.sh
-# sbatch scripts/run_gen_image_vars1.sh
-# sbatch scripts/run_gen_image_vars2.sh
-# sbatch scripts/run_gen_image_vars3.sh
-# sbatch scripts/run_gen_image_vars4.sh
+sbatch scripts/run_gen_image_vars0.sh
+sbatch scripts/run_gen_image_vars1.sh
+sbatch scripts/run_gen_image_vars2.sh
+sbatch scripts/run_gen_image_vars3.sh
+sbatch scripts/run_gen_image_vars4.sh
 sbatch scripts/run_gen_image_vars5.sh
 sbatch scripts/run_gen_image_vars6.sh
 sbatch scripts/run_gen_image_vars7.sh

@@ -112,7 +112,7 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
             out_img_pil = tf.keras.preprocessing.image.array_to_img(out_img)
             out_img_tensor = tf.io.encode_jpeg(tf.keras.preprocessing.image.array_to_img(out_img_pil))
             out_images.append(out_img_tensor)
-        data_saver.save_variation2(cur_id, cur_label, out_filepath, *out_images)
+        data_saver.save_variation3(cur_id, cur_label, out_filepath, inp_image_bytes, *out_images)
 
         # Code for testing output was saved correctly.
         ##############################################

@@ -123,3 +123,22 @@ def save_variation2(id, label, filename, *images):
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
             writer.write(example.SerializeToString())
+
+def save_variation3(id, label, filename, original_img, *images):
+    print(f'Writing to {filename}')
+    with tf.io.TFRecordWriter(filename) as writer:
+        feature_dict = {
+            'image': tf.train.Feature(
+                bytes_list=tf.train.BytesList(
+                    value=[original_img])),
+            'label': tf.train.Feature(
+                int64_list=tf.train.Int64List(
+                    value=[label])),
+            'id': tf.train.Feature(
+                int64_list=tf.train.Int64List(
+                    value=[id]))
+        }
+        for idx, image in enumerate(images):
+            feature_dict[f'variation_{idx}'] = tf.train.Feature(bytes_list=tf.train.BytesList(value=[image.numpy()]))
+        example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+        writer.write(example.SerializeToString())
