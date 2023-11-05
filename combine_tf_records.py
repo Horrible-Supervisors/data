@@ -10,12 +10,15 @@ def main(tfrecord_dir, out_path, **kwargs):
     tfrecord_list = sorted([os.path.join(tfrecord_dir, x) for x in os.listdir(tfrecord_dir)])
     with tf.io.TFRecordWriter(out_path) as writer:
         for idx, inp_filepath in enumerate(tfrecord_list):
-            print(f"{idx} / {len(tfrecord_list)}", flush=True)
+            print(f"{idx} / {len(tfrecord_list)}, {inp_filepath}", flush=True)
             ds = tf.data.TFRecordDataset(inp_filepath)
+            count = 0
             for element in ds.as_numpy_iterator():
+                print(f"{idx}, {count}", flush=True)
                 example = tf.train.Example()
                 example.ParseFromString(element)
                 writer.write(example.SerializeToString())
+                count += 1
     print("Complete", flush=True)
 
 if __name__ == '__main__':

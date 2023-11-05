@@ -12,13 +12,17 @@ import torch
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-tf2_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(tf2_dir)
-# import data_utils
+repo_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(repo_dir)
+import data_saver
 
 # data_utils.preprocess_image(image, height, width, is_training=False, color_jitter_strength=0., test_crop=True)
 DEVICE = "cuda"
 NUM_IMAGES = 5
+
+WIDTH = 224
+HEIGHT = 224
+CROP_PROPORTION = 0.875  # Standard for ImageNet.
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
@@ -78,39 +82,48 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
     if input_id > -1:
        out_filepath = out_filepath + f"_{input_id:06d}"
 
-    with tf.io.TFRecordWriter(out_filepath) as writer:
-        inp_image_list = []
-        for element in ds.as_numpy_iterator():
-            # print(f"{count} / {size}", flush=True)
-            example = tf.train.Example()
-            example.ParseFromString(element)
+    inp_image_list = []
+    for element in ds.as_numpy_iterator():
+        # print(f"{count} / {size}", flush=True)
+        example = tf.train.Example()
+        example.ParseFromString(element)
 
-            cur_id = example.features.feature['id'].int64_list.value[0]
+        cur_id = example.features.feature['id'].int64_list.value[0]
+        cur_label = example.features.feature['label'].int64_list.value[0]
 
-            if cur_id < input_id and input_id > -1:
-               continue
+        if cur_id < input_id and input_id > -1:
+            continue
 
-            if cur_id > input_id and input_id > -1:
-               break
+        if cur_id > input_id and input_id > -1:
+            break
 
-            inp_image_bytes = example.features.feature['image'].bytes_list.value[0]
-            inp_image = tform(Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))).unsqueeze(0)
-            inp_image_list.append(inp_image)
-            # if len(inp_image_list) % 25 == 0:
-            inp_image_tensor = torch.cat(inp_image_list)
-            inp = inp_image_tensor.to(DEVICE)
-            out = sd_pipe(inp, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, num_images_per_prompt=NUM_IMAGES)
+        inp_image_bytes = example.features.feature['image'].bytes_list.value[0]
+        inp_image = tform(Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))).unsqueeze(0)
+        inp_image_list.append(inp_image)
+        inp_image_tensor = torch.cat(inp_image_list)
+        inp = inp_image_tensor.to(DEVICE)
+        out = sd_pipe(inp, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, num_images_per_prompt=NUM_IMAGES)
 
-            # out_image_list = generate_image_variation(inp_image)
-            out_image_list = out['images']
-            for idx, image_variation in enumerate(out_image_list):
-                image_variation_bytes = tf.train.BytesList(value=[np.array(image_variation).tobytes()])
-                example.features.feature[f'image_variation_{idx}'].CopyFrom(tf.train.Feature(bytes_list=image_variation_bytes))
-            writer.write(example.SerializeToString())
-            # pdb.set_trace()
-            # count += 1
+        out_image_list = out['images']
+        out_image_list_tensors = [tf.convert_to_tensor(x) for x in out_image_list]
+        out_images = []
+        for cur_image in out_image_list_tensors:
+            out_img = data_saver.center_crop(cur_image, WIDTH, HEIGHT, CROP_PROPORTION)
+            out_img_pil = tf.keras.preprocessing.image.array_to_img(out_img)
+            out_img_tensor = tf.io.encode_jpeg(tf.keras.preprocessing.image.array_to_img(out_img_pil))
+            out_images.append(out_img_tensor)
+        data_saver.save_variation2(cur_id, cur_label, out_filepath, *out_images)
+
+        # Code for testing output was saved correctly.
+        ##############################################
+        # ds2 = tf.data.TFRecordDataset(out_filepath)
+        # for test_element in ds.as_numpy_iterator():
+        #     test_ex = tf.train.Example()
+        #     test_ex.ParseFromString(test_element)
+        #     out_image_bytes = test_ex.features.feature['image'].bytes_list.value[0]
 
 def main(tfrecord_filepath, out_path, input_id, **kwargs):
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     add_variation_sequence(tfrecord_filepath, out_path, input_id=input_id)
     print("Complete", flush=True)
 

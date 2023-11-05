@@ -1,4 +1,4 @@
-import os
+import os, pdb, shutil
 from argparse import ArgumentParser
 
 import numpy as np
@@ -60,23 +60,32 @@ if __name__ == '__main__':
         print("Creating dataset...")
 
         if not os.path.exists(args.out_dir):
-            os.makedirs(args.out_dir)
+            os.makedirs(args.out_dir, exist_ok=True)
 
         ids = np.arange(args.size)
         train = np.arange(args.train)
         val = np.arange(args.val)
 
-        count = 0
+        shutil.copy(os.path.join(args.data_dir, 'features.json'), os.path.join(args.out_dir, 'features.json'))
+        shutil.copy(os.path.join(args.data_dir, 'label.labels.txt'), os.path.join(args.out_dir, 'label.labels.txt'))
+        shutil.copy(os.path.join(args.data_dir, 'dataset_info.json'), os.path.join(args.out_dir, 'dataset_info.json'))
+        if not os.path.exists(os.path.join(args.out_dir, '../../.config')):
+            shutil.copytree(os.path.join(args.data_dir, '../../.config'), os.path.join(args.out_dir, '../../.config'))
 
+        count = 0
         for t in train:
             count = append_id_v2(f'{args.data_dir}/{args.format_train}.tfrecord-{t:05d}-of-{args.train:05d}',
-                                 ids, f'{args.out_dir}/{args.format_train}.tfrecord-{t:05d}-of-{args.train:05d}')
+                                 ids,
+                                 f'{args.out_dir}/{args.format_train}.tfrecord-{t:05d}-of-{args.train:05d}',
+                                 count)
             print(f'Training shard {t} done. {count} images processed.')
 
         for v in val:
             count = append_id_v2(f'{args.data_dir}/{args.format_val}.tfrecord-{v:05d}-of-{args.val:05d}',
-                                 ids, f'{args.out_dir}/{args.format_val}.tfrecord-{v:05d}-of-{args.val:05d}')
-            print(f'Validation shard {t} done. {count} images processed.')
+                                 ids,
+                                 f'{args.out_dir}/{args.format_val}.tfrecord-{v:05d}-of-{args.val:05d}',
+                                 count)
+            print(f'Validation shard {v} done. {count} images processed.')
     else:
         print("Checking dataset...")
         check_image(
