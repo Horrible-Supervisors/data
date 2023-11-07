@@ -18,7 +18,7 @@ import data_saver
 
 # data_utils.preprocess_image(image, height, width, is_training=False, color_jitter_strength=0., test_crop=True)
 DEVICE = "cuda"
-NUM_IMAGES = 5
+NUM_IMAGES = 10
 
 WIDTH = 224
 HEIGHT = 224
