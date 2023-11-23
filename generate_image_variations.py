@@ -5,6 +5,8 @@ import argparse as ap
 
 from PIL import Image
 from diffusers import StableDiffusionImageVariationPipeline
+from diffusers import UnCLIPImageVariationPipeline
+from diffusers import StableUnCLIPImg2ImgPipeline
 from torchvision import transforms
 
 import torch
@@ -36,24 +38,41 @@ if gpus:
     # Memory growth must be set before GPUs have been initialized
     print(e)
 
+# tform = transforms.Compose([
+#     transforms.ToTensor(),
+# ])
+# sd_pipe = StableUnCLIPImg2ImgPipeline.from_pretrained(
+#     "stabilityai/stable-diffusion-2-1-unclip", torch_dtype=torch.float16, variation="fp16"
+# )
+# sd_pipe = sd_pipe.to(DEVICE)
+# sd_pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+
 tform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Resize(
-        (224, 224),
-        interpolation=transforms.InterpolationMode.BICUBIC,
-        antialias=False,
-        ),
-    transforms.Normalize(
-    [0.48145466, 0.4578275, 0.40821073],
-    [0.26862954, 0.26130258, 0.27577711]),
 ])
-
-sd_pipe = StableDiffusionImageVariationPipeline.from_pretrained(
-    "lambdalabs/sd-image-variations-diffusers",
-    revision="v2.0"
+sd_pipe = UnCLIPImageVariationPipeline.from_pretrained(
+   "fusing/karlo-image-variations-diffusers", torch_dtype=torch.float16
 )
 sd_pipe = sd_pipe.to(DEVICE)
 sd_pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+
+# tform = transforms.Compose([
+#     transforms.ToTensor(),
+#     transforms.Resize(
+#         (224, 224),
+#         interpolation=transforms.InterpolationMode.BICUBIC,
+#         antialias=False,
+#         ),
+#     transforms.Normalize(
+#     [0.48145466, 0.4578275, 0.40821073],
+#     [0.26862954, 0.26130258, 0.27577711]),
+# ])
+# sd_pipe = StableDiffusionImageVariationPipeline.from_pretrained(
+#     "lambdalabs/sd-image-variations-diffusers",
+#     revision="v2.0"
+# )
+# sd_pipe = sd_pipe.to(DEVICE)
+# sd_pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 
 shard_lengths = np.array([
     592, 592, 591, 592, 592, 592, 592, 591,
@@ -63,7 +82,8 @@ shard_lengths = np.array([
 def generate_image_variation(img, **kwargs):
     guidance_scale = kwargs.get('guidance_scale', 3.0)
     num_inference_steps = kwargs.get('num_inference_steps', 50)
-    inp = tform(img).to(DEVICE).unsqueeze(0)
+    inp = img.to(DEVICE).unsqueeze(0)
+    # inp = tform(img).to(DEVICE).unsqueeze(0)
     out = sd_pipe(inp, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, num_images_per_prompt=NUM_IMAGES)
     return out["images"]
 
@@ -98,12 +118,14 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
             break
 
         inp_image_bytes = example.features.feature['image'].bytes_list.value[0]
-        inp_image = tform(Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))).unsqueeze(0)
-        inp_image_list.append(inp_image)
-        inp_image_tensor = torch.cat(inp_image_list)
-        inp = inp_image_tensor.to(DEVICE)
-        out = sd_pipe(inp, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, num_images_per_prompt=NUM_IMAGES)
-
+        inp_image = Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))
+        # inp_image = tform(Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))).unsqueeze(0)
+        # inp_image_list.append(inp_image)
+        # inp_image_tensor = torch.cat(inp_image_list)
+        # inp = inp_image_tensor.to(DEVICE)
+        # out = sd_pipe(inp, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps, num_images_per_prompt=NUM_IMAGES)
+        # out = sd_pipe(inp_image, num_images_per_prompt=NUM_IMAGES)
+        out = sd_pipe(inp_image, num_images_per_prompt=NUM_IMAGES, decoder_num_inference_steps=25, decoder_guidance_scale=3.0, super_res_num_inference_steps=10)
         out_image_list = out['images']
         out_image_list_tensors = [tf.convert_to_tensor(x) for x in out_image_list]
         out_images = []
