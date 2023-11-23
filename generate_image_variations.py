@@ -1,4 +1,4 @@
-import os, pdb, sys
+import os, pdb, sys, time
 import numpy as np
 import pandas as pd
 import argparse as ap
@@ -28,15 +28,15 @@ CROP_PROPORTION = 0.875  # Standard for ImageNet.
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
-  try:
-    # Currently, memory growth needs to be the same across GPUs
-    for gpu in gpus:
-      tf.config.experimental.set_memory_growth(gpu, True)
-    logical_gpus = tf.config.list_logical_devices('GPU')
-    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-  except RuntimeError as e:
-    # Memory growth must be set before GPUs have been initialized
-    print(e)
+    try:
+        # Currently, memory growth needs to be the same across GPUs
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        print(e)
 
 # tform = transforms.Compose([
 #     transforms.ToTensor(),
@@ -51,7 +51,7 @@ tform = transforms.Compose([
     transforms.ToTensor(),
 ])
 sd_pipe = UnCLIPImageVariationPipeline.from_pretrained(
-   "fusing/karlo-image-variations-diffusers", torch_dtype=torch.float16
+    "fusing/karlo-image-variations-diffusers", torch_dtype=torch.float16
 )
 sd_pipe = sd_pipe.to(DEVICE)
 sd_pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
@@ -88,9 +88,15 @@ def generate_image_variation(img, **kwargs):
     return out["images"]
 
 def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
-    input_id = kwargs.get('input_id', -1)
+    input_id = kwargs.get('input_id', [-1])
     guidance_scale = kwargs.get('guidance_scale', 3.0)
     num_inference_steps = kwargs.get('num_inference_steps', 50)
+    use_range = kwargs.get("use_range", False)
+
+    if use_range and len(input_id) == 2:
+        input_id_list = np.arange(input_id[0], input_id[1]).tolist()
+    else:
+        input_id_list = input_id
 
     count = 0
     size = 0
@@ -99,23 +105,33 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
        size += 1
     print(f"Size: {size}", flush=True)
 
-    if input_id > -1:
-       out_filepath = out_filepath + f"_{input_id:06d}"
-
+    # for input_id in input_id_list:
+    #     if input_id > -1:
+    #         out_filepath = out_filepath + f"_{input_id:06d}"
+    #     else:
+    #         raise Exception(f"input_id == {input_id}, must be > -1.")
+    start_output_filepath = out_filepath
     inp_image_list = []
+    loop_time = time.time()
     for element in ds.as_numpy_iterator():
-        # print(f"{count} / {size}", flush=True)
+        print(f"{time.time() - loop_time}", flush=True)
+        loop_time = time.time()
         example = tf.train.Example()
         example.ParseFromString(element)
 
         cur_id = example.features.feature['id'].int64_list.value[0]
         cur_label = example.features.feature['label'].int64_list.value[0]
 
-        if cur_id < input_id and input_id > -1:
+        out_filepath = start_output_filepath + f"_{cur_id:06d}"
+
+        if cur_id not in input_id_list:
             continue
 
-        if cur_id > input_id and input_id > -1:
-            break
+        # if cur_id < input_id and input_id > -1:
+        #     continue
+
+        # if cur_id > input_id and input_id > -1:
+        #     break
 
         inp_image_bytes = example.features.feature['image'].bytes_list.value[0]
         inp_image = Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))
@@ -146,14 +162,15 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
 
 def main(tfrecord_filepath, out_path, input_id, **kwargs):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    add_variation_sequence(tfrecord_filepath, out_path, input_id=input_id)
+    add_variation_sequence(tfrecord_filepath, out_path, input_id=input_id, use_range=kwargs.get('use_range', False))
     print("Complete", flush=True)
 
 if __name__ == '__main__':
     parser = ap.ArgumentParser()
     parser.add_argument('--tfrecord_filepath', '-tfp', type=str, help='Path to a tensorflow record.')
     parser.add_argument('--out_path', '-o', type=str, help='Output path.')
-    parser.add_argument('--input_id', '-id', type=int, required=False, default=-1, help='Input Id.')
+    parser.add_argument('--input_id', '-id', type=int, required=False, nargs='+', help='Input Id.')
+    parser.add_argument('--use_range', action='store_true', default=False, help='Range')
     args = parser.parse_args()
 
     args, _ = parser.parse_known_args()
