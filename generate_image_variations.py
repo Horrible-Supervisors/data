@@ -92,6 +92,7 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
     guidance_scale = kwargs.get('guidance_scale', 3.0)
     num_inference_steps = kwargs.get('num_inference_steps', 50)
     use_range = kwargs.get("use_range", False)
+    half = kwargs.get("half", False)
 
     if use_range and len(input_id) == 2:
         input_id_list = np.arange(input_id[0], input_id[1]).tolist()
@@ -105,17 +106,17 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
        size += 1
     print(f"Size: {size}", flush=True)
 
-    # for input_id in input_id_list:
-    #     if input_id > -1:
-    #         out_filepath = out_filepath + f"_{input_id:06d}"
-    #     else:
-    #         raise Exception(f"input_id == {input_id}, must be > -1.")
+    selected_classes = np.arange(1001)
+    if half:
+        df = pd.read_csv("train-50-1000.csv")
+        selected_classes = np.unique(df['label'])
+    print(selected_classes)
+
     start_output_filepath = out_filepath
     inp_image_list = []
     loop_time = time.time()
+    last_size = 0
     for element in ds.as_numpy_iterator():
-        print(f"{time.time() - loop_time}", flush=True)
-        loop_time = time.time()
         example = tf.train.Example()
         example.ParseFromString(element)
 
@@ -123,15 +124,19 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
         cur_label = example.features.feature['label'].int64_list.value[0]
 
         out_filepath = start_output_filepath + f"_{cur_id:06d}"
+        print(f"{time.time() - loop_time}, {out_filepath}", flush=True)
+        loop_time = time.time()
+
+        # Don't redo samples we have already done.
+        if os.path.exists(out_filepath):
+            continue
+
+        # Pick only the selected classes
+        if cur_label not in selected_classes:
+            continue
 
         if cur_id not in input_id_list:
             continue
-
-        # if cur_id < input_id and input_id > -1:
-        #     continue
-
-        # if cur_id > input_id and input_id > -1:
-        #     break
 
         inp_image_bytes = example.features.feature['image'].bytes_list.value[0]
         inp_image = Image.fromarray(np.asarray(tf.image.decode_jpeg(inp_image_bytes, channels=3)))
@@ -162,7 +167,9 @@ def add_variation_sequence(inp_filepath, out_filepath, **kwargs):
 
 def main(tfrecord_filepath, out_path, input_id, **kwargs):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    add_variation_sequence(tfrecord_filepath, out_path, input_id=input_id, use_range=kwargs.get('use_range', False))
+    use_range = kwargs.get('use_range', False)
+    half = kwargs.get('half', False)
+    add_variation_sequence(tfrecord_filepath, out_path, input_id=input_id, use_range=use_range, half=half)
     print("Complete", flush=True)
 
 if __name__ == '__main__':
@@ -171,6 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_path', '-o', type=str, help='Output path.')
     parser.add_argument('--input_id', '-id', type=int, required=False, nargs='+', help='Input Id.')
     parser.add_argument('--use_range', action='store_true', default=False, help='Range')
+    parser.add_argument('--half', action='store_true', default=False, help='50 classes')
     args = parser.parse_args()
 
     args, _ = parser.parse_known_args()
